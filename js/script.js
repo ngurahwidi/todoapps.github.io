@@ -1,5 +1,7 @@
 const todos = [];
 const RENDER_EVENT = 'render-todo';
+const SAVED_EVENT = 'saved-todo';
+const STORAGE_KEY = 'TODO_APPS';
 
 document.addEventListener(RENDER_EVENT, function(){
     const uncompletedTODOList = document.getElementById('todos');
@@ -11,19 +13,56 @@ document.addEventListener(RENDER_EVENT, function(){
     for (const todoItem of todos){
         const todoElement = makeTodo(todoItem);
         if (!todoItem.isCompleted)
-            uncompletedTODOList.append(todoElement);
+          uncompletedTODOList.append(todoElement); 
         else
-        completedTODOList.append(todoElement);
-        }   
+          completedTODOList.append(todoElement);  
+    }           
 });
 
-document.addEventListener('DOMContentLoaded', function(){
-    const submitForm = document.getElementById('form');
-    submitForm.addEventListener('submit', function(event){
-        event.preventDefault();
-        addTodo();
-    });
+function isStorageExist(){
+  if(typeof(Storage) === undefined){
+      alert('Browser kamu tidak mendukung local storage');
+      return false;
+  }
+  return true;
+}
+document.addEventListener(SAVED_EVENT, function(){
+  console.log(localStorage.getItem(STORAGE_KEY));
+})
+
+function loadDataFromStorage() {
+  const serializedData = localStorage.getItem(STORAGE_KEY);
+  let data = JSON.parse(serializedData);
+ 
+  if (data !== null) {
+    for (const todo of data) {
+      todos.push(todo);
+    }
+  }
+ 
+  document.dispatchEvent(new Event(RENDER_EVENT));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const submitForm = document.getElementById('form');
+
+  submitForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      addTodo();
+  });
+
+  if (isStorageExist()) {
+      loadDataFromStorage();
+  }
 });
+
+function saveData() {
+  if (isStorageExist()) {
+      const parsed = JSON.stringify(todos);
+      localStorage.setItem(STORAGE_KEY, parsed);
+      document.dispatchEvent(new Event(SAVED_EVENT));
+  }
+}
 
 function addTodo() {
     const textTodo = document.getElementById('title').value;
@@ -34,17 +73,18 @@ function addTodo() {
     todos.push(todoObject);
 
     document.dispatchEvent(new Event(RENDER_EVENT));
+    saveData();
 }
 
 function generateId() {
     return + new Date();
 }
 
-function generateTodoObject(id, task, timestamp, isCompleted) {
+function generateTodoObject(id, task, date, isCompleted) {
     return {
         id,
         task,
-        timestamp,
+        date,
         isCompleted
     }
 }
@@ -54,7 +94,7 @@ function makeTodo(todoObject){
     textTitle.innerText = todoObject.task;
 
     const textTimestamp = document.createElement('p');
-    textTimestamp.innerText = todoObject.timestamp;
+    textTimestamp.innerText = todoObject.date;
 
     const textContainer = document.createElement('div');
     textContainer.classList.add('inner');
@@ -89,7 +129,14 @@ function makeTodo(todoObject){
             addTaskToCompleted(todoObject.id);
         });
 
-        container.append(checkButton);
+        const trashButton = document.createElement('button');
+        trashButton.classList.add('trash-button');
+
+        trashButton.addEventListener('click', function(){
+            removeTaskFromCompleted(todoObject.id);
+        });
+
+        container.append(checkButton, trashButton);
     }
 
     function addTaskToCompleted(todoId){
@@ -99,6 +146,8 @@ function makeTodo(todoObject){
 
         todoTarget.isCompleted = true;
         document.dispatchEvent(new Event(RENDER_EVENT));
+        saveData();
+
     }
 
     function findTodo(todoId){
@@ -117,6 +166,7 @@ function makeTodo(todoObject){
        
         todos.splice(todoTarget, 1);
         document.dispatchEvent(new Event(RENDER_EVENT));
+        saveData();
       }
        
        
@@ -127,6 +177,7 @@ function makeTodo(todoObject){
        
         todoTarget.isCompleted = false;
         document.dispatchEvent(new Event(RENDER_EVENT));
+        saveData();
       }
 
       function findTodoIndex(todoId) {
@@ -135,9 +186,10 @@ function makeTodo(todoObject){
             return index;
           }
         }
-       
+
         return -1;
       }
+    
 
     return container;
 }
